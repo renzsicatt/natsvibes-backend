@@ -20,6 +20,14 @@ class Profile extends Model
         'safety_preference',
     ];
 
+    protected $appends = ['is_verified'];
+
+    public function getIsVerifiedAttribute(): bool
+    {
+        return $this->verification_status === 'approved';
+    }
+
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
