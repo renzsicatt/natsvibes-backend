@@ -11,7 +11,11 @@ class GroupMessage extends Model
         'hangout_id',
         'sender_id',
         'message_text',
+        'type',
+        'reported_at',
     ];
+
+    protected $casts = ['reported_at' => 'datetime'];
 
     public function hangout(): BelongsTo
     {

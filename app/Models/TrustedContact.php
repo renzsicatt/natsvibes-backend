@@ -15,6 +15,11 @@ class TrustedContact extends Model
         'relation',
     ];
 
+    protected $casts = [
+        'phone_number' => 'encrypted',
+        'email' => 'encrypted',
+    ];
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

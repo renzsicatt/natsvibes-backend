@@ -13,11 +13,19 @@ class SafetyCheckin extends Model
         'checkin_time',
         'status',
         'reminder_time',
+        'scheduled_for',
+        'reminded_at',
+        'responded_at',
+        'escalated_at',
     ];
 
     protected $casts = [
         'checkin_time' => 'datetime',
         'reminder_time' => 'datetime',
+        'scheduled_for' => 'datetime',
+        'reminded_at' => 'datetime',
+        'responded_at' => 'datetime',
+        'escalated_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

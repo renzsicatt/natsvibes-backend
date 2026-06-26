@@ -3,17 +3,19 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Laravel\Sanctum\HasApiTokens;
 use Database\Factories\UserFactory;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'phone', 'password'])]
+#[Fillable(['name', 'email', 'phone', 'date_of_birth', 'role', 'status', 'password', 'last_login_at', 'suspended_until', 'banned_at', 'deletion_requested_at'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
@@ -28,6 +30,11 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'phone_verified_at' => 'datetime',
+            'date_of_birth' => 'date',
+            'last_login_at' => 'datetime',
+            'suspended_until' => 'datetime',
+            'banned_at' => 'datetime',
+            'deletion_requested_at' => 'datetime',
             'password' => 'hashed',
         ];
     }
@@ -38,5 +45,27 @@ class User extends Authenticatable
     public function profile()
     {
         return $this->hasOne(Profile::class);
+    }
+
+    public function trustedContacts()
+    {
+        return $this->hasMany(TrustedContact::class);
+    }
+
+    public function isAdmin(): bool
+    {
+        return in_array($this->role, ['admin', 'super_admin'], true);
+    }
+
+    public function canHost(): bool
+    {
+        return in_array($this->role, ['host', 'admin', 'super_admin'], true)
+            && $this->status === 'active'
+            && $this->profile?->host_verification_status === 'approved';
+    }
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return $this->status === 'active' && $this->isAdmin();
     }
 }

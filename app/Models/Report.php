@@ -15,7 +15,14 @@ class Report extends Model
         'reason',
         'details',
         'status',
+        'reported_message_id',
+        'severity',
+        'assigned_admin_id',
+        'resolution',
+        'resolved_at',
     ];
+
+    protected $casts = ['resolved_at' => 'datetime'];
 
     public function reporter(): BelongsTo
     {

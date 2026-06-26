@@ -12,7 +12,12 @@ class JoinRequest extends Model
         'user_id',
         'status',
         'notes',
+        'decided_by',
+        'decided_at',
+        'cancelled_at',
     ];
+
+    protected $casts = ['decided_at' => 'datetime', 'cancelled_at' => 'datetime'];
 
     public function hangout(): BelongsTo
     {

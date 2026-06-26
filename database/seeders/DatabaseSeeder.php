@@ -2,17 +2,18 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
+use App\Models\Hangout;
 use App\Models\Profile;
+use App\Models\Report;
+use App\Models\User;
 use App\Models\Venue;
+use App\Models\VenuePhoto;
 use App\Models\VenueTag;
 use App\Models\VibeTag;
-use App\Models\Hangout;
-use App\Models\Report;
-use App\Models\VenuePhoto;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -23,7 +24,7 @@ class DatabaseSeeder extends Seeder
     {
         // Disable foreign keys checks to truncate tables safely
         Schema::disableForeignKeyConstraints();
-        
+
         User::truncate();
         Profile::truncate();
         Venue::truncate();
@@ -39,6 +40,9 @@ class DatabaseSeeder extends Seeder
         $admin = User::create([
             'name' => 'Admin User',
             'email' => 'admin@natsvibe.com',
+            'role' => 'admin',
+            'status' => 'active',
+            'date_of_birth' => '1990-01-01',
             'password' => Hash::make('password'),
         ]);
 
@@ -85,7 +89,7 @@ class DatabaseSeeder extends Seeder
                 'city' => 'Makati',
                 'bio' => 'Electronic music and craft cocktail enthusiast.',
                 'avatar_url' => 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-            ]
+            ],
         ];
 
         $hosts = [];
@@ -93,6 +97,9 @@ class DatabaseSeeder extends Seeder
             $user = User::create([
                 'name' => $hData['name'],
                 'email' => $hData['email'],
+                'role' => 'host',
+                'status' => 'active',
+                'date_of_birth' => now()->subYears($hData['age'])->toDateString(),
                 'password' => Hash::make('password'),
             ]);
 
@@ -105,6 +112,8 @@ class DatabaseSeeder extends Seeder
                 'avatar_url' => $hData['avatar_url'],
                 'completion_status' => 'completed',
                 'verification_status' => 'approved',
+                'photo_review_status' => 'approved',
+                'host_verification_status' => 'approved',
             ]);
 
             $hosts[$hData['name']] = $user;
@@ -135,7 +144,7 @@ class DatabaseSeeder extends Seeder
                 'city' => 'Manila',
                 'bio' => 'Always down for a singing/karaoke session.',
                 'avatar_url' => 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-            ]
+            ],
         ];
 
         $seededPending = [];
@@ -143,6 +152,8 @@ class DatabaseSeeder extends Seeder
             $user = User::create([
                 'name' => $pData['name'],
                 'email' => $pData['email'],
+                'status' => 'pending_verification',
+                'date_of_birth' => now()->subYears($pData['age'])->toDateString(),
                 'password' => Hash::make('password'),
             ]);
 
@@ -166,20 +177,20 @@ class DatabaseSeeder extends Seeder
                 'name' => 'MarkSpam99',
                 'email' => 'markspam@natsvibe.com',
                 'bio' => 'Just here for fun',
-                'avatar_url' => 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80'
+                'avatar_url' => 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
             ],
             [
                 'name' => 'AlexDancer',
                 'email' => 'alexdancer@natsvibe.com',
                 'bio' => 'Techno lover',
-                'avatar_url' => 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=150&q=80'
+                'avatar_url' => 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=150&q=80',
             ],
             [
                 'name' => 'Sofia Go',
                 'email' => 'sofiago@natsvibe.com',
                 'bio' => 'Art curator',
-                'avatar_url' => 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=150&q=80'
-            ]
+                'avatar_url' => 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=150&q=80',
+            ],
         ];
 
         $seededReported = [];
@@ -187,6 +198,8 @@ class DatabaseSeeder extends Seeder
             $user = User::create([
                 'name' => $rData['name'],
                 'email' => $rData['email'],
+                'status' => 'active',
+                'date_of_birth' => '1995-01-01',
                 'password' => Hash::make('password'),
             ]);
 
@@ -211,12 +224,12 @@ class DatabaseSeeder extends Seeder
             'First-timer',
             'Introvert-friendly',
             'Singles',
-            'Budget-friendly'
+            'Budget-friendly',
         ];
         foreach ($vibeTags as $tag) {
             VibeTag::create([
                 'name' => $tag,
-                'slug' => \Illuminate\Support\Str::slug($tag)
+                'slug' => Str::slug($tag),
             ]);
         }
 
@@ -257,19 +270,19 @@ class DatabaseSeeder extends Seeder
         VenuePhoto::create([
             'venue_id' => $venue1->id,
             'photo_url' => 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=600&q=80',
-            'is_primary' => true
+            'is_primary' => true,
         ]);
 
         VenuePhoto::create([
             'venue_id' => $venue2->id,
             'photo_url' => 'https://images.unsplash.com/photo-1533777857889-4be7c70b33f7?auto=format&fit=crop&w=600&q=80',
-            'is_primary' => true
+            'is_primary' => true,
         ]);
 
         VenuePhoto::create([
             'venue_id' => $venue3->id,
             'photo_url' => 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=600&q=80',
-            'is_primary' => true
+            'is_primary' => true,
         ]);
 
         // Create venue tags mappings
@@ -332,7 +345,7 @@ class DatabaseSeeder extends Seeder
             'reported_hangout_id' => $hangout1->id,
             'reason' => 'Spamming Links',
             'details' => 'Sent telegram links to crypto channels in the group chat multiple times.',
-            'status' => 'pending'
+            'status' => 'pending',
         ]);
 
         Report::create([
@@ -341,7 +354,7 @@ class DatabaseSeeder extends Seeder
             'reported_hangout_id' => $hangout2->id,
             'reason' => 'No-Show / Unresponsive',
             'details' => 'Host approved request, but user did not attend and blocked messages on meet up.',
-            'status' => 'pending'
+            'status' => 'pending',
         ]);
     }
 }

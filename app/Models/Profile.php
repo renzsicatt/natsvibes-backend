@@ -11,6 +11,7 @@ class Profile extends Model
     protected $fillable = [
         'user_id',
         'name',
+        'display_name',
         'age',
         'city',
         'bio',
@@ -18,6 +19,10 @@ class Profile extends Model
         'completion_status',
         'verification_status',
         'safety_preference',
+        'going_out_style',
+        'availability',
+        'photo_review_status',
+        'host_verification_status',
     ];
 
     protected $appends = ['is_verified'];
@@ -26,7 +31,6 @@ class Profile extends Model
     {
         return $this->verification_status === 'approved';
     }
-
 
     public function user(): BelongsTo
     {

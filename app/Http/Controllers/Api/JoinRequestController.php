@@ -3,102 +3,109 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Block;
 use App\Models\Hangout;
 use App\Models\JoinRequest;
+use App\Notifications\ActivityNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 
 class JoinRequestController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, Hangout $hangout): JsonResponse
     {
-        $query = JoinRequest::with(['hangout', 'user.profile'])->latest();
+        abort_unless($request->user()->isAdmin() || $hangout->host_id === $request->user()->id, 403);
 
-        if ($request->filled('host_id')) {
-            $query->whereHas('hangout', function ($hangoutQuery) use ($request) {
-                $hangoutQuery->where('host_id', $request->integer('host_id'));
-            });
-        }
-
-        return response()->json(
-            $query->get()->map(fn (JoinRequest $joinRequest) => $this->formatJoinRequest($joinRequest))
-        );
+        return response()->json(['data' => $hangout->joinRequests()->with('user.profile.vibeTags')->latest()->cursorPaginate(25)]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, Hangout $hangout): JsonResponse
     {
-        $validated = $request->validate([
-            'hangout_id' => ['required', 'exists:hangouts,id'],
-            'user_id' => ['required', 'exists:users,id'],
-            'notes' => ['nullable', 'string', 'max:1000'],
-        ]);
+        $validated = $request->validate(['message' => ['nullable', 'string', 'max:1000']]);
+        $user = $request->user();
 
-        $hangout = Hangout::findOrFail($validated['hangout_id']);
+        abort_if($hangout->host_id === $user->id, 422, 'Host is already a member.');
+        abort_unless($user->profile?->completion_status === 'completed', 403, 'Complete your profile first.');
+        abort_unless(in_array($hangout->status, ['open'], true), 409, 'Hangout is not accepting requests.');
+        abort_if($hangout->request_cutoff_at?->isPast() || $hangout->date_time->isPast(), 409, 'The request cutoff has passed.');
+        abort_if($this->blockedPairExists($user->id, $hangout->host_id), 403, 'This interaction is unavailable.');
 
-        if ((int) $hangout->host_id === (int) $validated['user_id']) {
-            return response()->json(['message' => 'Host is already part of this hangout.'], 422);
-        }
-
-        $joinRequest = JoinRequest::updateOrCreate(
-            [
-                'hangout_id' => $validated['hangout_id'],
-                'user_id' => $validated['user_id'],
-            ],
-            [
-                'notes' => $validated['notes'] ?? null,
-                'status' => 'pending',
-            ]
+        $joinRequest = JoinRequest::firstOrCreate(
+            ['hangout_id' => $hangout->id, 'user_id' => $user->id],
+            ['status' => 'pending', 'notes' => $validated['message'] ?? null],
         );
+        abort_unless($joinRequest->wasRecentlyCreated, 409, 'A request already exists for this hangout.');
+        $hangout->host->notify(new ActivityNotification('join_request_received', ['hangout_id' => $hangout->id, 'join_request_id' => $joinRequest->id]));
 
-        return response()->json(
-            $this->formatJoinRequest($joinRequest->load(['hangout', 'user.profile'])),
-            $joinRequest->wasRecentlyCreated ? 201 : 200
-        );
+        return response()->json(['data' => $joinRequest], 201);
     }
 
-    public function update(Request $request, JoinRequest $joinRequest): JsonResponse
+    public function approve(Request $request, JoinRequest $joinRequest): JsonResponse
     {
-        $validated = $request->validate([
-            'status' => ['required', Rule::in(['pending', 'approved', 'declined'])],
-        ]);
+        $result = DB::transaction(function () use ($request, $joinRequest): JoinRequest {
+            $locked = JoinRequest::whereKey($joinRequest->id)->lockForUpdate()->firstOrFail();
+            $hangout = Hangout::whereKey($locked->hangout_id)->lockForUpdate()->firstOrFail();
+            abort_unless($request->user()->isAdmin() || $hangout->host_id === $request->user()->id, 403);
+            abort_unless($locked->status === 'pending', 409, 'Request is no longer pending.');
+            abort_unless($hangout->status === 'open', 409, 'Hangout is not open.');
+            abort_if($hangout->request_cutoff_at?->isPast(), 409, 'The request cutoff has passed.');
+            abort_if($this->blockedPairExists($locked->user_id, $hangout->host_id), 409, 'Blocked users cannot be approved.');
 
-        DB::transaction(function () use ($joinRequest, $validated) {
-            $joinRequest->update(['status' => $validated['status']]);
+            $count = DB::table('hangout_members')->where('hangout_id', $hangout->id)->where('status', 'active')->count();
+            abort_if($count >= $hangout->group_size_limit, 409, 'Hangout is full.');
 
-            if ($validated['status'] === 'approved') {
-                $joinRequest->hangout->members()->syncWithoutDetaching([
-                    $joinRequest->user_id => ['joined_at' => now()],
-                ]);
+            $locked->update(['status' => 'approved', 'decided_by' => $request->user()->id, 'decided_at' => now()]);
+            DB::table('hangout_members')->updateOrInsert(
+                ['hangout_id' => $hangout->id, 'user_id' => $locked->user_id],
+                ['role' => 'member', 'status' => 'active', 'joined_at' => now(), 'left_at' => null, 'created_at' => now(), 'updated_at' => now()],
+            );
+            if ($count + 1 >= $hangout->group_size_limit) {
+                $hangout->update(['status' => 'full']);
             }
+            DB::afterCommit(fn () => $locked->user->notify(new ActivityNotification('join_request_approved', ['hangout_id' => $hangout->id])));
+
+            return $locked;
         });
 
-        return response()->json(
-            $this->formatJoinRequest($joinRequest->fresh(['hangout', 'user.profile']))
-        );
+        return response()->json(['data' => $result->fresh(['hangout', 'user.profile'])]);
     }
 
-    private function formatJoinRequest(JoinRequest $joinRequest): array
+    public function decline(Request $request, JoinRequest $joinRequest): JsonResponse
     {
-        $user = $joinRequest->user;
-        $profile = $user->profile;
+        abort_unless($request->user()->isAdmin() || $joinRequest->hangout->host_id === $request->user()->id, 403);
+        abort_unless($joinRequest->status === 'pending', 409);
+        $joinRequest->update(['status' => 'declined', 'decided_by' => $request->user()->id, 'decided_at' => now()]);
+        $joinRequest->user->notify(new ActivityNotification('join_request_declined', ['hangout_id' => $joinRequest->hangout_id]));
 
-        return [
-            'id' => $joinRequest->id,
-            'hangout_id' => $joinRequest->hangout_id,
-            'hangout_title' => $joinRequest->hangout?->title ?? 'Unknown hangout',
-            'user' => [
-                'name' => $user->name,
-                'age' => $profile?->age ?? 0,
-                'city' => $profile?->city ?? '',
-                'bio' => $profile?->bio ?? '',
-                'avatar_url' => $profile?->avatar_url ?? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-                'is_verified' => (bool) ($profile?->is_verified ?? false),
-                'vibe_tags' => [],
-            ],
-            'notes' => $joinRequest->notes ?? '',
-            'status' => $joinRequest->status,
-        ];
+        return response()->json(['data' => $joinRequest]);
+    }
+
+    public function cancel(Request $request, JoinRequest $joinRequest): JsonResponse
+    {
+        abort_unless($joinRequest->user_id === $request->user()->id && $joinRequest->status === 'pending', 403);
+        $joinRequest->update(['status' => 'cancelled', 'cancelled_at' => now()]);
+
+        return response()->json(['data' => $joinRequest]);
+    }
+
+    public function leave(Request $request, Hangout $hangout): JsonResponse
+    {
+        abort_if($hangout->host_id === $request->user()->id, 422, 'Host must cancel the hangout.');
+        $member = DB::table('hangout_members')->where(['hangout_id' => $hangout->id, 'user_id' => $request->user()->id, 'status' => 'active']);
+        abort_unless($member->exists(), 404);
+        $member->update(['status' => 'withdrawn', 'left_at' => now(), 'updated_at' => now()]);
+        JoinRequest::where(['hangout_id' => $hangout->id, 'user_id' => $request->user()->id, 'status' => 'approved'])->update(['status' => 'withdrawn']);
+        if ($hangout->status === 'full' && (! $hangout->request_cutoff_at || $hangout->request_cutoff_at->isFuture())) {
+            $hangout->update(['status' => 'open']);
+        }
+
+        return response()->json(['data' => ['message' => 'You left the hangout.']]);
+    }
+
+    private function blockedPairExists(int $a, int $b): bool
+    {
+        return Block::where(fn ($q) => $q->where('blocker_id', $a)->where('blocked_id', $b))
+            ->orWhere(fn ($q) => $q->where('blocker_id', $b)->where('blocked_id', $a))->exists();
     }
 }

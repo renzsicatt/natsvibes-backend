@@ -19,10 +19,22 @@ class Hangout extends Model
         'group_size_limit',
         'budget_range',
         'status',
+        'rules',
+        'host_notes',
+        'request_cutoff_at',
+        'timezone',
+        'budget_min',
+        'budget_max',
+        'currency',
+        'previous_status',
+        'cancelled_at',
+        'cancellation_reason',
     ];
 
     protected $casts = [
         'date_time' => 'datetime',
+        'request_cutoff_at' => 'datetime',
+        'cancelled_at' => 'datetime',
     ];
 
     public function host(): BelongsTo
@@ -37,7 +49,9 @@ class Hangout extends Model
 
     public function members(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'hangout_members')->withTimestamps();
+        return $this->belongsToMany(User::class, 'hangout_members')
+            ->withPivot(['role', 'status', 'joined_at', 'left_at'])
+            ->withTimestamps();
     }
 
     public function joinRequests(): HasMany
@@ -48,5 +62,15 @@ class Hangout extends Model
     public function messages(): HasMany
     {
         return $this->hasMany(GroupMessage::class);
+    }
+
+    public function vibeTags(): BelongsToMany
+    {
+        return $this->belongsToMany(VibeTag::class, 'hangout_vibe_tags');
+    }
+
+    public function activeMembers(): BelongsToMany
+    {
+        return $this->members()->wherePivot('status', 'active');
     }
 }

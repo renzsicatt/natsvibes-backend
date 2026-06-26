@@ -3,74 +3,42 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Hangout;
 use App\Models\GroupMessage;
-use Illuminate\Http\Request;
+use App\Models\Hangout;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class GroupMessageController extends Controller
 {
-    /**
-     * Fetch messages for a specific hangout.
-     */
-    public function index(Request $request, $hangoutId): JsonResponse
+    public function index(Request $request, Hangout $hangout): JsonResponse
     {
-        $user = $request->user();
-        
-        // Ensure user is host or member of the hangout
-        $hangout = Hangout::findOrFail($hangoutId);
-        if ($hangout->host_id !== $user->id && !$hangout->members()->where('user_id', $user->id)->exists()) {
-            return response()->json(['message' => 'Unauthorized to access this hangout chat.'], 403);
-        }
+        $this->assertMember($request, $hangout);
+        $messages = $hangout->messages()->with('sender.profile')->latest('id')->cursorPaginate(50);
 
-        $messages = GroupMessage::with('sender')
-            ->where('hangout_id', $hangoutId)
-            ->orderBy('created_at', 'asc')
-            ->get();
-
-        $formatted = $messages->map(function ($msg) use ($user) {
-            return [
-                'id' => $msg->id,
-                'sender' => $msg->sender->name,
-                'text' => $msg->message_text,
-                'time' => $msg->created_at->timezone('Asia/Manila')->format('g:i A'),
-                'isMe' => (int) $msg->sender_id === (int) $user->id
-            ];
-        });
-
-        return response()->json($formatted);
+        return response()->json(['data' => $messages]);
     }
 
-    /**
-     * Send a new message to a specific hangout.
-     */
-    public function store(Request $request, $hangoutId): JsonResponse
+    public function store(Request $request, Hangout $hangout): JsonResponse
     {
-        $user = $request->user();
-        
-        $validated = $request->validate([
-            'message_text' => 'required|string|max:2000'
-        ]);
+        $this->assertMember($request, $hangout);
+        abort_if(in_array($hangout->status, ['cancelled', 'completed'], true), 409);
+        $validated = $request->validate(['body' => ['required', 'string', 'max:2000']]);
+        $message = GroupMessage::create(['hangout_id' => $hangout->id, 'sender_id' => $request->user()->id, 'message_text' => $validated['body'], 'type' => 'message']);
 
-        $hangout = Hangout::findOrFail($hangoutId);
-        if ($hangout->host_id !== $user->id && !$hangout->members()->where('user_id', $user->id)->exists()) {
-            return response()->json(['message' => 'Unauthorized to send messages to this hangout chat.'], 403);
-        }
+        return response()->json(['data' => $message->load('sender.profile')], 201);
+    }
 
-        $msg = GroupMessage::create([
-            'hangout_id' => $hangoutId,
-            'sender_id' => $user->id,
-            'message_text' => $validated['message_text']
-        ]);
+    public function announcement(Request $request, Hangout $hangout): JsonResponse
+    {
+        abort_unless($request->user()->isAdmin() || $hangout->host_id === $request->user()->id, 403);
+        $validated = $request->validate(['body' => ['required', 'string', 'max:2000']]);
+        $message = GroupMessage::create(['hangout_id' => $hangout->id, 'sender_id' => $request->user()->id, 'message_text' => $validated['body'], 'type' => 'announcement']);
 
-        $formatted = [
-            'id' => $msg->id,
-            'sender' => $user->name,
-            'text' => $msg->message_text,
-            'time' => $msg->created_at->timezone('Asia/Manila')->format('g:i A'),
-            'isMe' => true
-        ];
+        return response()->json(['data' => $message], 201);
+    }
 
-        return response()->json($formatted, 201);
+    private function assertMember(Request $request, Hangout $hangout): void
+    {
+        abort_unless($request->user()->isAdmin() || $hangout->activeMembers()->whereKey($request->user()->id)->exists(), 403);
     }
 }
