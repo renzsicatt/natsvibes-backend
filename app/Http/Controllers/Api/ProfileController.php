@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Profile;
+use App\Notifications\ActivityNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -50,7 +51,7 @@ class ProfileController extends Controller
             Storage::disk('public')->delete($profile->avatar_url);
         }
         $path = $request->file('photo')->store('profile-photos', 'public');
-        $profile->update(['avatar_url' => $path, 'photo_review_status' => 'pending', 'verification_status' => 'pending']);
+        $profile->update(['avatar_url' => $path, 'photo_review_status' => 'pending']);
 
         return response()->json(['data' => ['path' => $path, 'review_status' => 'pending']], 201);
     }
@@ -65,7 +66,23 @@ class ProfileController extends Controller
 
     public function verifications(): JsonResponse
     {
-        return response()->json(['data' => Profile::with('user')->where('verification_status', 'pending')->latest()->paginate(25)]);
+        return response()->json(['data' => Profile::with('user')->where(function ($query): void {
+            $query->where('verification_status', 'pending')
+                ->orWhere('photo_review_status', 'pending')
+                ->orWhere('host_verification_status', 'pending');
+        })->latest()->paginate(25)]);
+    }
+
+    public function requestHostVerification(Request $request): JsonResponse
+    {
+        $profile = $request->user()->profile;
+        abort_unless($profile?->completion_status === 'completed', 409, 'Complete your profile first.');
+        abort_unless($profile->verification_status === 'approved' && $profile->photo_review_status === 'approved', 409, 'Complete member verification first.');
+        abort_unless(in_array($profile->host_verification_status, ['not_requested', 'declined'], true), 409, 'Host verification is already in progress or approved.');
+
+        $profile->update(['host_verification_status' => 'pending']);
+
+        return response()->json(['data' => $profile->fresh('vibeTags')]);
     }
 
     public function verify(Request $request, Profile $profile): JsonResponse
@@ -96,6 +113,11 @@ class ProfileController extends Controller
                 'target_id' => $profile->id,
                 'created_at' => now(), 'updated_at' => now(),
             ]);
+
+            DB::afterCommit(fn () => $profile->user->notify(new ActivityNotification(
+                ($validated['host_status'] ?? null) ? 'host_verification_updated' : 'profile_verification_updated',
+                ['status' => ($validated['host_status'] ?? null) ?: $validated['status']],
+            )));
         });
 
         return response()->json(['data' => $profile->fresh('user')]);

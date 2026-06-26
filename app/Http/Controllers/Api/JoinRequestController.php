@@ -13,6 +13,17 @@ use Illuminate\Support\Facades\DB;
 
 class JoinRequestController extends Controller
 {
+    public function mine(Request $request): JsonResponse
+    {
+        $items = JoinRequest::query()
+            ->with(['hangout.venue', 'hangout.host.profile'])
+            ->where('user_id', $request->user()->id)
+            ->latest()
+            ->cursorPaginate(25);
+
+        return response()->json(['data' => $items]);
+    }
+
     public function index(Request $request, Hangout $hangout): JsonResponse
     {
         abort_unless($request->user()->isAdmin() || $hangout->host_id === $request->user()->id, 403);

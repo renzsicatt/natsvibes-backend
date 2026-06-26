@@ -52,6 +52,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(TrustedContact::class);
     }
 
+    public function deviceTokens()
+    {
+        return $this->hasMany(DeviceToken::class);
+    }
+
     public function isAdmin(): bool
     {
         return in_array($this->role, ['admin', 'super_admin'], true);

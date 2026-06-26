@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BlockController;
 use App\Http\Controllers\Api\FeedbackController;
+use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\GroupMessageController;
 use App\Http\Controllers\Api\HangoutController;
 use App\Http\Controllers\Api\JoinRequestController;
@@ -30,17 +31,22 @@ Route::prefix('v1')->group(function (): void {
         Route::put('me/profile', [ProfileController::class, 'updateMe']);
         Route::post('me/profile/photo', [ProfileController::class, 'uploadPhoto']);
         Route::delete('me', [ProfileController::class, 'requestDeletion']);
-    });
+        Route::post('device-tokens', [DeviceTokenController::class, 'store']);
+        Route::delete('device-tokens/{deviceToken}', [DeviceTokenController::class, 'destroy']);
 
-    Route::middleware(['auth:sanctum', 'active'])->group(function (): void {
-
+        // Pending members may browse while completing verification, but all
+        // community mutations remain behind the active-account middleware.
         Route::get('venues', [VenueController::class, 'index']);
         Route::get('venues/{venue}', [VenueController::class, 'show']);
         Route::get('vibe-tags', [VibeTagController::class, 'index']);
-
         Route::get('hangouts', [HangoutController::class, 'index']);
         Route::get('hangouts/{hangout}', [HangoutController::class, 'show']);
+        Route::get('me/join-requests', [JoinRequestController::class, 'mine']);
+    });
+
+    Route::middleware(['auth:sanctum', 'active'])->group(function (): void {
         Route::get('me/hangouts', [HangoutController::class, 'myHangouts']);
+        Route::post('me/host-verification', [ProfileController::class, 'requestHostVerification']);
         Route::post('hangouts', [HangoutController::class, 'store'])->middleware('role:host,admin,super_admin');
         Route::put('hangouts/{hangout}', [HangoutController::class, 'update']);
         Route::post('hangouts/{hangout}/cancel', [HangoutController::class, 'cancel']);

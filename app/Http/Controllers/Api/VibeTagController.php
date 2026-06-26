@@ -15,9 +15,7 @@ class VibeTagController extends Controller
      */
     public function index(): JsonResponse
     {
-        $tags = VibeTag::all()->pluck('name');
-
-        return response()->json($tags);
+        return response()->json(['data' => VibeTag::query()->orderBy('name')->get(['id', 'name'])]);
     }
 
     /**
@@ -34,6 +32,6 @@ class VibeTagController extends Controller
             'slug' => Str::slug($validated['name']),
         ]);
 
-        return response()->json($tag->name, 201);
+        return response()->json(['data' => $tag], 201);
     }
 }

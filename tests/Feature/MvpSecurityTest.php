@@ -35,6 +35,110 @@ class MvpSecurityTest extends TestCase
         ])->assertUnprocessable();
     }
 
+    public function test_pending_user_can_browse_venues_while_verification_is_in_progress(): void
+    {
+        $user = User::factory()->create(['status' => 'pending_verification']);
+        Profile::create([
+            'user_id' => $user->id,
+            'name' => $user->name,
+            'display_name' => $user->name,
+            'completion_status' => 'incomplete',
+            'verification_status' => 'pending',
+        ]);
+        Venue::create([
+            'name' => 'Browseable Venue',
+            'slug' => 'browseable-venue',
+            'area' => 'Poblacion',
+            'city' => 'Makati',
+            'address' => 'Public address',
+            'venue_type' => 'Bar',
+            'price_range' => '$$',
+            'status' => 'listed',
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $this->getJson('/api/v1/venues')
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'Browseable Venue']);
+    }
+
+    public function test_pending_user_can_sign_in_while_verification_is_in_progress(): void
+    {
+        $user = User::factory()->create([
+            'email' => 'pending@example.com',
+            'password' => 'strongpass123',
+            'status' => 'pending_verification',
+        ]);
+        Profile::create([
+            'user_id' => $user->id,
+            'name' => $user->name,
+            'display_name' => $user->name,
+            'completion_status' => 'incomplete',
+            'verification_status' => 'pending',
+        ]);
+
+        $this->postJson('/api/v1/auth/login', [
+            'email' => 'pending@example.com',
+            'password' => 'strongpass123',
+            'device_name' => 'test',
+        ])->assertOk()
+            ->assertJsonPath('data.user.status', 'pending_verification')
+            ->assertJsonStructure(['data' => ['token']]);
+    }
+
+    public function test_user_can_only_list_their_own_join_requests(): void
+    {
+        $host = $this->eligibleUser('host');
+        $user = $this->eligibleUser();
+        $other = $this->eligibleUser();
+        $hangout = $this->hangout($host);
+        $mine = $hangout->joinRequests()->create(['user_id' => $user->id, 'status' => 'pending']);
+        $hangout->joinRequests()->create(['user_id' => $other->id, 'status' => 'pending']);
+
+        Sanctum::actingAs($user);
+
+        $this->getJson('/api/v1/me/join-requests')
+            ->assertOk()
+            ->assertJsonCount(1, 'data.data')
+            ->assertJsonPath('data.data.0.id', $mine->id);
+    }
+
+    public function test_verified_member_can_request_host_verification(): void
+    {
+        $user = $this->eligibleUser();
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/v1/me/host-verification')
+            ->assertOk()
+            ->assertJsonPath('data.host_verification_status', 'pending');
+
+        $this->postJson('/api/v1/me/host-verification')->assertConflict();
+    }
+
+    public function test_profile_approval_creates_a_user_notification(): void
+    {
+        $admin = $this->eligibleUser('admin');
+        $user = User::factory()->create(['status' => 'pending_verification']);
+        $profile = Profile::create([
+            'user_id' => $user->id,
+            'name' => $user->name,
+            'display_name' => $user->name,
+            'city' => 'Makati',
+            'bio' => 'Ready for review.',
+            'completion_status' => 'completed',
+            'verification_status' => 'pending',
+            'photo_review_status' => 'pending',
+            'host_verification_status' => 'not_requested',
+        ]);
+        Sanctum::actingAs($admin);
+
+        $this->putJson("/api/v1/admin/verifications/{$profile->id}", ['status' => 'approved'])->assertOk();
+
+        $this->assertDatabaseHas('notifications', ['notifiable_id' => $user->id]);
+        $this->assertSame('profile_verification_updated', $user->fresh()->notifications()->first()?->data['event']);
+    }
+
     public function test_regular_user_cannot_create_a_hangout_or_admin_venue(): void
     {
         $user = $this->eligibleUser();

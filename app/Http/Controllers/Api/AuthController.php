@@ -67,7 +67,7 @@ class AuthController extends Controller
             return response()->json(['error' => ['code' => 'INVALID_CREDENTIALS', 'message' => 'The provided credentials are invalid.']], 422);
         }
 
-        if ($user->status !== 'active') {
+        if (! in_array($user->status, ['active', 'pending_verification'], true)) {
             return response()->json(['error' => ['code' => 'ACCOUNT_UNAVAILABLE', 'message' => 'This account cannot sign in.']], 403);
         }
 

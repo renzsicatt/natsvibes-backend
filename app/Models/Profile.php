@@ -29,7 +29,8 @@ class Profile extends Model
 
     public function getIsVerifiedAttribute(): bool
     {
-        return $this->verification_status === 'approved';
+        return $this->verification_status === 'approved'
+            && $this->photo_review_status === 'approved';
     }
 
     public function user(): BelongsTo
