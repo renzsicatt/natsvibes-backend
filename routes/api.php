@@ -9,8 +9,10 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\VibeTagController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\GroupMessageController;
 
 Route::post('/login', [AuthController::class, 'login']);
+Route::post('/register', [AuthController::class, 'register']);
 
 Route::get('/me', function (Request $request) {
     $user = $request->user()->load('profile.vibeTags');
@@ -32,6 +34,10 @@ Route::get('/me', function (Request $request) {
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
+Route::get('/my-hangouts', [HangoutController::class, 'myHangouts'])->middleware('auth:sanctum');
+Route::get('/hangouts/{hangout}/messages', [GroupMessageController::class, 'index'])->middleware('auth:sanctum');
+Route::post('/hangouts/{hangout}/messages', [GroupMessageController::class, 'store'])->middleware('auth:sanctum');
 
 Route::apiResource('venues', VenueController::class);
 Route::apiResource('hangouts', HangoutController::class)->only(['index', 'show', 'store']);

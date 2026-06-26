@@ -16,7 +16,7 @@ class VenueController extends Controller
      */
     public function index(): JsonResponse
     {
-        $venues = Venue::with('tags')->get();
+        $venues = Venue::with(['tags', 'photos'])->get();
         
         $formatted = $venues->map(function ($venue) {
             $array = $venue->toArray();

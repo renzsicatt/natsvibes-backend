@@ -62,7 +62,7 @@ class HangoutController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'venue_id' => 'required|exists:venues,id',
-            'date_time' => 'required|date',
+            'date_time' => 'required|string',
             'area' => 'required|string',
             'description' => 'nullable|string',
             'group_size_limit' => 'integer|min:3|max:10',
@@ -70,10 +70,18 @@ class HangoutController extends Controller
             'host_id' => 'required|exists:users,id'
         ]);
 
+        $timestamp = strtotime($validated['date_time']);
+        if (!$timestamp) {
+            return response()->json([
+                'message' => 'The date time field must be a valid date or relative time (e.g., "Saturday, 9:00 PM").'
+            ], 422);
+        }
+        $formattedDateTime = date('Y-m-d H:i:s', $timestamp);
+
         $hangout = Hangout::create([
             'title' => $validated['title'],
             'venue_id' => $validated['venue_id'],
-            'date_time' => $validated['date_time'],
+            'date_time' => $formattedDateTime,
             'area' => $validated['area'],
             'description' => $validated['description'] ?? null,
             'group_size_limit' => $validated['group_size_limit'] ?? 6,
@@ -122,6 +130,34 @@ class HangoutController extends Controller
             'vibe_tags' => ['Drinks', 'Social'],
             'members' => array_merge([$hangout->host->name], $hangout->members->pluck('name')->toArray())
         ];
+
+        return response()->json($formatted);
+    }
+
+    /**
+     * Get hangouts the authenticated user hosts or is a member of.
+     */
+    public function myHangouts(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $hangouts = Hangout::with(['host.profile', 'venue', 'members.profile'])
+            ->where('host_id', $user->id)
+            ->orWhereHas('members', function ($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })
+            ->latest()
+            ->get();
+
+        $formatted = $hangouts->map(function ($hangout) {
+            return [
+                'id' => $hangout->id,
+                'title' => $hangout->title,
+                'venue_name' => $hangout->venue->name,
+                'members_names' => array_merge([$hangout->host->name], $hangout->members->pluck('name')->toArray()),
+                'time_summary' => $hangout->date_time->format('g:i A')
+            ];
+        });
 
         return response()->json($formatted);
     }

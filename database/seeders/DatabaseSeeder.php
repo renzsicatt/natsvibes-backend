@@ -9,6 +9,7 @@ use App\Models\VenueTag;
 use App\Models\VibeTag;
 use App\Models\Hangout;
 use App\Models\Report;
+use App\Models\VenuePhoto;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -26,6 +27,7 @@ class DatabaseSeeder extends Seeder
         User::truncate();
         Profile::truncate();
         Venue::truncate();
+        VenuePhoto::truncate();
         VenueTag::truncate();
         VibeTag::truncate();
         Hangout::truncate();
@@ -250,6 +252,24 @@ class DatabaseSeeder extends Seeder
             'price_range' => '$',
             'reservation_required' => false,
             'status' => 'active',
+        ]);
+
+        VenuePhoto::create([
+            'venue_id' => $venue1->id,
+            'photo_url' => 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?auto=format&fit=crop&w=600&q=80',
+            'is_primary' => true
+        ]);
+
+        VenuePhoto::create([
+            'venue_id' => $venue2->id,
+            'photo_url' => 'https://images.unsplash.com/photo-1533777857889-4be7c70b33f7?auto=format&fit=crop&w=600&q=80',
+            'is_primary' => true
+        ]);
+
+        VenuePhoto::create([
+            'venue_id' => $venue3->id,
+            'photo_url' => 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?auto=format&fit=crop&w=600&q=80',
+            'is_primary' => true
         ]);
 
         // Create venue tags mappings
