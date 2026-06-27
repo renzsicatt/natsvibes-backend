@@ -50,6 +50,9 @@ class ActivityNotification extends Notification implements ShouldQueue
             'profile_verification_updated' => 'Your profile verification was updated.',
             'host_verification_updated' => 'Your host verification was updated.',
             'waitlist_promoted' => 'A spot opened up. Your request is ready for host review.',
+            'account_suspend' => 'Your account has been temporarily suspended.',
+            'account_ban' => 'Your account has been banned.',
+            'account_restore' => 'Your account access has been restored.',
         ];
 
         return [

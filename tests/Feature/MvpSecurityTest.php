@@ -180,6 +180,32 @@ class MvpSecurityTest extends TestCase
         $this->assertDatabaseHas('hangout_members', ['hangout_id' => $hangout->id, 'user_id' => $guest->id, 'status' => 'active']);
     }
 
+    public function test_admin_can_suspend_and_restore_a_user_with_an_audit_trail(): void
+    {
+        $admin = $this->eligibleUser('admin');
+        $user = $this->eligibleUser();
+        Sanctum::actingAs($admin);
+
+        $this->postJson("/api/v1/admin/users/{$user->id}/moderate", [
+            'action' => 'suspend', 'reason' => 'Repeated safety policy violations.',
+            'suspended_until' => now()->addDay()->toIso8601String(),
+        ])->assertOk()->assertJsonPath('data.status', 'suspended');
+        $this->assertDatabaseHas('admin_actions', ['admin_id' => $admin->id, 'action_type' => 'user_suspend', 'target_id' => $user->id]);
+
+        $this->postJson("/api/v1/admin/users/{$user->id}/moderate", [
+            'action' => 'restore', 'reason' => 'Manual review completed successfully.',
+        ])->assertOk()->assertJsonPath('data.status', 'active');
+    }
+
+    public function test_admin_cannot_moderate_their_own_account(): void
+    {
+        $admin = $this->eligibleUser('admin');
+        Sanctum::actingAs($admin);
+
+        $this->postJson("/api/v1/admin/users/{$admin->id}/moderate", ['action' => 'ban', 'reason' => 'Invalid self action.'])
+            ->assertUnprocessable();
+    }
+
     private function eligibleUser(string $role = 'user'): User
     {
         $user = User::factory()->create(['role' => $role, 'status' => 'active']);

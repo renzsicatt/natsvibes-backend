@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AdminMfaController;
+use App\Http\Controllers\Api\AdminUserController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BlockController;
 use App\Http\Controllers\Api\DeviceTokenController;
@@ -95,6 +96,8 @@ Route::prefix('v1')->group(function (): void {
         });
 
         Route::prefix('admin')->middleware(['role:admin,super_admin', 'admin.mfa'])->group(function (): void {
+            Route::get('users', [AdminUserController::class, 'index']);
+            Route::post('users/{user}/moderate', [AdminUserController::class, 'moderate'])->middleware('throttle:20,1');
             Route::apiResource('venues', VenueController::class)->except(['index', 'show']);
             Route::get('reports', [ReportController::class, 'index']);
             Route::put('reports/{report}', [ReportController::class, 'update']);

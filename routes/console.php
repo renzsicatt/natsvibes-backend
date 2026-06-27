@@ -17,10 +17,17 @@ Schedule::call(function (): void {
             $checkin->update(['status' => 'reminder_sent', 'reminded_at' => now()]);
             $checkin->user->notify(new ActivityNotification('safety_checkin_reminder', ['checkin_id' => $checkin->id, 'hangout_id' => $checkin->hangout_id]));
         });
+
+    User::where('status', 'suspended')->where('suspended_until', '<=', now())
+        ->each(function (User $user): void {
+            $user->update(['status' => 'active', 'suspended_until' => null]);
+            $user->notify(new ActivityNotification('account_restore', ['reason' => 'Suspension period completed.']));
+        });
 })->everyMinute()->name('natsvibe-lifecycle')->withoutOverlapping();
 
 Schedule::command('accounts:anonymize-deleted')->dailyAt('02:30')->name('account-anonymization')->withoutOverlapping();
 
+use App\Models\User;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 
