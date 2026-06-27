@@ -70,6 +70,16 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(Favorite::class);
     }
 
+    public function appeals()
+    {
+        return $this->hasMany(ModerationAppeal::class);
+    }
+
+    public function peerReviewsReceived()
+    {
+        return $this->hasMany(PeerReview::class, 'reviewed_user_id');
+    }
+
     public function isAdmin(): bool
     {
         return in_array($this->role, ['admin', 'super_admin'], true);

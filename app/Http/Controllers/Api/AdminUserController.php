@@ -19,7 +19,13 @@ class AdminUserController extends Controller
             'role' => ['nullable', Rule::in(['user', 'host', 'admin', 'super_admin'])],
             'search' => ['nullable', 'string', 'max:100'],
         ]);
-        $query = User::with('profile')->latest();
+        $query = User::with('profile')
+            ->withAvg('peerReviewsReceived as reputation_rating', 'rating')
+            ->withCount([
+                'peerReviewsReceived as reputation_review_count',
+                'peerReviewsReceived as no_show_strikes' => fn ($q) => $q->where('attendance', 'no_show'),
+                'peerReviewsReceived as safety_flags' => fn ($q) => $q->where('safety_concern', true),
+            ])->latest();
         $query->when($validated['status'] ?? null, fn ($q, string $status) => $q->where('status', $status));
         $query->when($validated['role'] ?? null, fn ($q, string $role) => $q->where('role', $role));
         $query->when($validated['search'] ?? null, fn ($q, string $search) => $q->where(fn ($nested) => $nested

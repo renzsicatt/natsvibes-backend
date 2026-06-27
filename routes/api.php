@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AdminMfaController;
 use App\Http\Controllers\Api\AdminUserController;
+use App\Http\Controllers\Api\AppealController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BlockController;
 use App\Http\Controllers\Api\DeviceTokenController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\Api\JoinRequestController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\ReputationController;
 use App\Http\Controllers\Api\SafetyCheckinController;
 use App\Http\Controllers\Api\TrustedContactController;
 use App\Http\Controllers\Api\VenueController;
@@ -27,6 +29,7 @@ Route::prefix('v1')->group(function (): void {
         Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
         Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:3,60');
         Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:5,60');
+        Route::post('appeals', [AppealController::class, 'store'])->middleware('throttle:3,60');
     });
 
     Route::middleware('auth:sanctum')->group(function (): void {
@@ -87,6 +90,8 @@ Route::prefix('v1')->group(function (): void {
         Route::post('safety-checkins/{safetyCheckin}/help', [SafetyCheckinController::class, 'help']);
         Route::post('hangouts/{hangout}/attendance', [FeedbackController::class, 'attendance']);
         Route::post('hangouts/{hangout}/feedback', [FeedbackController::class, 'feedback']);
+        Route::post('hangouts/{hangout}/peer-reviews', [ReputationController::class, 'store']);
+        Route::get('users/{user}/reputation', [ReputationController::class, 'show']);
         Route::get('notifications', [NotificationController::class, 'index']);
         Route::post('notifications/read-all', [NotificationController::class, 'readAll']);
         Route::post('notifications/{notification}/read', [NotificationController::class, 'read']);
@@ -101,6 +106,8 @@ Route::prefix('v1')->group(function (): void {
         Route::prefix('admin')->middleware(['role:admin,super_admin', 'admin.mfa'])->group(function (): void {
             Route::get('users', [AdminUserController::class, 'index']);
             Route::get('messages', [GroupMessageController::class, 'adminIndex']);
+            Route::get('appeals', [AppealController::class, 'index']);
+            Route::post('appeals/{appeal}/decide', [AppealController::class, 'decide']);
             Route::post('users/{user}/moderate', [AdminUserController::class, 'moderate'])->middleware('throttle:20,1');
             Route::apiResource('venues', VenueController::class)->except(['index', 'show']);
             Route::get('reports', [ReportController::class, 'index']);

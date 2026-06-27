@@ -31,6 +31,7 @@ Updated: 2026-06-27
 - venue/hangout favorites, full-capacity waitlists with promotion, and shareable invite deep links
 - audited admin user suspension, banning, restoration, and automatic suspension expiry
 - chat replies, reactions, time-limited edits, soft deletion, and audited admin message moderation
+- completed-hangout peer reputation, no-show/safety signals, and audited account appeals
 - scheduled hangout/check-in lifecycle job
 - moderation queue and audited report/profile-review mutations
 - normalized validation/HTTP error envelope
@@ -38,7 +39,7 @@ Updated: 2026-06-27
 
 ## Verification performed
 
-- `php artisan test`: 29 tests, 92 assertions, passing
+- `php artisan test`: 31 tests, 102 assertions, passing
 - Laravel Pint check for touched areas: passing
 - isolated SQLite `migrate:fresh --seed`: passing
 - scheduler registration with isolated cache: passing

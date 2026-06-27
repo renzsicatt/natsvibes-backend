@@ -121,7 +121,7 @@ class HangoutController extends Controller
 
     public function myHangouts(Request $request): JsonResponse
     {
-        $items = Hangout::with(['venue', 'vibeTags'])->whereHas('activeMembers', fn (Builder $q) => $q->whereKey($request->user()->id))->latest('date_time')->cursorPaginate(20);
+        $items = Hangout::with(['venue', 'vibeTags', 'activeMembers.profile'])->whereHas('activeMembers', fn (Builder $q) => $q->whereKey($request->user()->id))->latest('date_time')->cursorPaginate(20);
 
         return response()->json(['data' => $items]);
     }

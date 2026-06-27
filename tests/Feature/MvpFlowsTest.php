@@ -151,6 +151,25 @@ class MvpFlowsTest extends TestCase
             ->assertJsonPath('data.share_url', 'natsvibe://hangouts/nightout1234');
     }
 
+    public function test_completed_hangout_members_can_build_a_reputation_history(): void
+    {
+        $host = $this->user('host');
+        $member = $this->user();
+        $hangout = $this->hangout($host, 'completed', now()->subDay());
+        $hangout->members()->attach($member->id, ['role' => 'member', 'status' => 'active', 'joined_at' => now()->subDays(2)]);
+        Sanctum::actingAs($host);
+
+        $this->postJson("/api/v1/hangouts/{$hangout->id}/peer-reviews", [
+            'reviewed_user_id' => $member->id, 'rating' => 2, 'attendance' => 'no_show',
+            'safety_concern' => true, 'private_notes' => 'Did not arrive or communicate.',
+        ])->assertCreated();
+
+        Sanctum::actingAs($member);
+        $this->getJson("/api/v1/users/{$member->id}/reputation")->assertOk()
+            ->assertJsonPath('data.no_show_strikes', 1)->assertJsonPath('data.safety_flags', 1)
+            ->assertJsonPath('data.average_rating', 2);
+    }
+
     private function user(string $role = 'user'): User
     {
         $user = User::factory()->create(['role' => $role, 'status' => 'active']);

@@ -53,6 +53,8 @@ class ActivityNotification extends Notification implements ShouldQueue
             'account_suspend' => 'Your account has been temporarily suspended.',
             'account_ban' => 'Your account has been banned.',
             'account_restore' => 'Your account access has been restored.',
+            'appeal_approved' => 'Your account appeal was approved.',
+            'appeal_declined' => 'Your account appeal was declined.',
         ];
 
         return [

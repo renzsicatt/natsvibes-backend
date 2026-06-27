@@ -206,6 +206,25 @@ class MvpSecurityTest extends TestCase
             ->assertUnprocessable();
     }
 
+    public function test_banned_user_can_appeal_and_admin_can_restore_access(): void
+    {
+        $admin = $this->eligibleUser('admin');
+        $user = $this->eligibleUser();
+        $user->update(['status' => 'banned', 'banned_at' => now()]);
+
+        $appeal = $this->postJson('/api/v1/auth/appeals', [
+            'email' => $user->email, 'password' => 'password',
+            'statement' => 'I believe the restriction should be reviewed because I can provide additional context.',
+        ])->assertCreated()->json('data');
+
+        Sanctum::actingAs($admin);
+        $this->postJson("/api/v1/admin/appeals/{$appeal['id']}/decide", [
+            'decision' => 'approved', 'notes' => 'Evidence reviewed; access may be restored.',
+        ])->assertOk()->assertJsonPath('data.status', 'approved');
+        $this->assertSame('active', $user->fresh()->status);
+        $this->assertDatabaseHas('admin_actions', ['action_type' => 'appeal_approved', 'target_id' => $appeal['id']]);
+    }
+
     private function eligibleUser(string $role = 'user'): User
     {
         $user = User::factory()->create(['role' => $role, 'status' => 'active']);
