@@ -42,6 +42,9 @@ class ProductionReadinessTest extends TestCase
 
         $evidence = Report::firstOrFail()->evidence()->firstOrFail();
         Storage::disk('local')->assertExists($evidence->path);
+
+        Sanctum::actingAs($this->activeUser('admin'));
+        $this->get("/api/v1/admin/reports/{$evidence->report_id}/evidence/{$evidence->id}")->assertOk();
     }
 
     public function test_admin_routes_can_require_mfa_enrollment(): void
