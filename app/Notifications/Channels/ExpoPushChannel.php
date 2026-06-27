@@ -16,6 +16,10 @@ class ExpoPushChannel
 
         $message = $notification->toExpoPush($notifiable);
         $payloads = $tokens->map(fn (string $token): array => ['to' => $token, ...$message])->values()->all();
-        Http::timeout(8)->post('https://exp.host/--/api/v2/push/send', $payloads)->throw();
+        $request = Http::timeout(8);
+        if ($token = config('services.expo.access_token')) {
+            $request = $request->withToken($token);
+        }
+        $request->post(config('services.expo.endpoint'), $payloads)->throw();
     }
 }

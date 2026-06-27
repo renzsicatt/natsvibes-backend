@@ -19,6 +19,8 @@ Schedule::call(function (): void {
         });
 })->everyMinute()->name('natsvibe-lifecycle')->withoutOverlapping();
 
+Schedule::command('accounts:anonymize-deleted')->dailyAt('02:30')->name('account-anonymization')->withoutOverlapping();
+
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 

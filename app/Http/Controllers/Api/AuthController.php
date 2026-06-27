@@ -72,9 +72,19 @@ class AuthController extends Controller
         }
 
         $user->update(['last_login_at' => now()]);
-        $token = $user->createToken($validated['device_name'] ?? 'mobile')->plainTextToken;
+        $requiresMfa = config('natsvibe.admin_mfa_required') && $user->isAdmin() && $user->admin_mfa_confirmed_at;
+        $requiresMfaEnrollment = config('natsvibe.admin_mfa_required') && $user->isAdmin() && ! $user->admin_mfa_confirmed_at;
+        $token = $user->createToken(
+            $validated['device_name'] ?? 'mobile',
+            $requiresMfa ? ['mfa:challenge'] : ['*'],
+        )->plainTextToken;
 
-        return response()->json(['data' => ['token' => $token, 'user' => $this->userData($user)]]);
+        return response()->json(['data' => [
+            'token' => $token,
+            'mfa_required' => (bool) $requiresMfa,
+            'mfa_enrollment_required' => $requiresMfaEnrollment,
+            'user' => $this->userData($user),
+        ]]);
     }
 
     public function forgotPassword(Request $request): JsonResponse

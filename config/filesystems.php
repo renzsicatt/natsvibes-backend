@@ -14,6 +14,8 @@ return [
     */
 
     'default' => env('FILESYSTEM_DISK', 'local'),
+    'profile_photos_disk' => env('PROFILE_PHOTOS_DISK', env('FILESYSTEM_DISK', 'public')),
+    'evidence_disk' => env('REPORT_EVIDENCE_DISK', 'local'),
 
     /*
     |--------------------------------------------------------------------------

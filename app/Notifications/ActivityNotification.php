@@ -4,9 +4,11 @@ namespace App\Notifications;
 
 use App\Notifications\Channels\ExpoPushChannel;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class ActivityNotification extends Notification
+class ActivityNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
@@ -14,7 +16,22 @@ class ActivityNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['database', ExpoPushChannel::class];
+        $channels = ['database'];
+        if ($notifiable->notificationPreference?->push_enabled ?? true) {
+            $channels[] = ExpoPushChannel::class;
+        }
+        if (config('natsvibe.transactional_email_enabled') && ($notifiable->notificationPreference?->email_enabled ?? true)) {
+            $channels[] = 'mail';
+        }
+
+        return $channels;
+    }
+
+    public function toMail(object $notifiable): MailMessage
+    {
+        $message = $this->toExpoPush($notifiable);
+
+        return (new MailMessage)->subject($message['title'].' update')->line($message['body'])->line('Open NatsVibe for details.');
     }
 
     public function toArray(object $notifiable): array

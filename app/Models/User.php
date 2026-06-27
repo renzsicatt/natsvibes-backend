@@ -9,16 +9,17 @@ use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable(['name', 'email', 'phone', 'date_of_birth', 'role', 'status', 'password', 'last_login_at', 'suspended_until', 'banned_at', 'deletion_requested_at'])]
-#[Hidden(['password', 'remember_token'])]
+#[Hidden(['password', 'remember_token', 'admin_mfa_secret'])]
 class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     /**
      * Get the attributes that should be cast.
@@ -35,6 +36,8 @@ class User extends Authenticatable implements FilamentUser
             'suspended_until' => 'datetime',
             'banned_at' => 'datetime',
             'deletion_requested_at' => 'datetime',
+            'admin_mfa_secret' => 'encrypted',
+            'admin_mfa_confirmed_at' => 'datetime',
             'password' => 'hashed',
         ];
     }
@@ -55,6 +58,11 @@ class User extends Authenticatable implements FilamentUser
     public function deviceTokens()
     {
         return $this->hasMany(DeviceToken::class);
+    }
+
+    public function notificationPreference()
+    {
+        return $this->hasOne(NotificationPreference::class);
     }
 
     public function isAdmin(): bool

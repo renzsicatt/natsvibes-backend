@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Report;
+use App\Models\ReportEvidence;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends Controller
 {
@@ -20,12 +23,28 @@ class ReportController extends Controller
             'reported_message_id' => ['nullable', 'integer', 'exists:group_messages,id'],
             'reason' => ['required', Rule::in(['harassment', 'unsafe_behavior', 'fake_profile', 'scam', 'no_show', 'venue_issue', 'inappropriate_message', 'other'])],
             'details' => ['required', 'string', 'max:5000'],
+            'evidence' => ['sometimes', 'array', 'max:5'],
+            'evidence.*' => ['file', 'mimes:jpeg,png,webp,pdf,mp4,mov', 'max:15360'],
         ]);
         abort_unless(collect($validated)->only(['reported_user_id', 'reported_hangout_id', 'reported_venue_id', 'reported_message_id'])->filter()->isNotEmpty(), 422, 'A report target is required.');
         $severity = in_array($validated['reason'], ['unsafe_behavior', 'harassment'], true) ? 'high' : 'medium';
-        $report = Report::create([...$validated, 'reporter_id' => $request->user()->id, 'status' => 'new', 'severity' => $severity]);
+        $files = $validated['evidence'] ?? [];
+        unset($validated['evidence']);
+        $report = DB::transaction(function () use ($request, $validated, $severity, $files): Report {
+            $report = Report::create([...$validated, 'reporter_id' => $request->user()->id, 'status' => 'new', 'severity' => $severity]);
+            $disk = config('filesystems.evidence_disk');
+            foreach ($files as $file) {
+                $path = $file->store('report-evidence/'.$report->id, $disk);
+                $report->evidence()->create([
+                    'disk' => $disk, 'path' => $path, 'mime_type' => $file->getMimeType(),
+                    'size' => $file->getSize(),
+                ]);
+            }
 
-        return response()->json(['data' => $report], 201);
+            return $report;
+        });
+
+        return response()->json(['data' => $report->load('evidence')], 201);
     }
 
     public function mine(Request $request): JsonResponse
@@ -35,7 +54,7 @@ class ReportController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = Report::with(['reporter', 'reportedUser', 'reportedHangout', 'reportedVenue'])->latest();
+        $query = Report::with(['reporter', 'reportedUser', 'reportedHangout', 'reportedVenue', 'evidence'])->latest();
         if ($request->filled('status')) {
             $query->where('status', $request->string('status'));
         }
@@ -65,5 +84,12 @@ class ReportController extends Controller
         });
 
         return response()->json(['data' => $report->fresh()]);
+    }
+
+    public function evidence(Report $report, ReportEvidence $evidence): StreamedResponse
+    {
+        abort_unless($evidence->report_id === $report->id, 404);
+
+        return Storage::disk($evidence->disk)->download($evidence->path);
     }
 }

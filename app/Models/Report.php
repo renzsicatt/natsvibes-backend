@@ -24,6 +24,11 @@ class Report extends Model
 
     protected $casts = ['resolved_at' => 'datetime'];
 
+    public function evidence()
+    {
+        return $this->hasMany(ReportEvidence::class);
+    }
+
     public function reporter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reporter_id');

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\GroupMessageCreated;
 use App\Http\Controllers\Controller;
 use App\Models\GroupMessage;
 use App\Models\Hangout;
@@ -24,6 +25,7 @@ class GroupMessageController extends Controller
         abort_if(in_array($hangout->status, ['cancelled', 'completed'], true), 409);
         $validated = $request->validate(['body' => ['required', 'string', 'max:2000']]);
         $message = GroupMessage::create(['hangout_id' => $hangout->id, 'sender_id' => $request->user()->id, 'message_text' => $validated['body'], 'type' => 'message']);
+        GroupMessageCreated::dispatch($message);
 
         return response()->json(['data' => $message->load('sender.profile')], 201);
     }
@@ -33,6 +35,7 @@ class GroupMessageController extends Controller
         abort_unless($request->user()->isAdmin() || $hangout->host_id === $request->user()->id, 403);
         $validated = $request->validate(['body' => ['required', 'string', 'max:2000']]);
         $message = GroupMessage::create(['hangout_id' => $hangout->id, 'sender_id' => $request->user()->id, 'message_text' => $validated['body'], 'type' => 'announcement']);
+        GroupMessageCreated::dispatch($message);
 
         return response()->json(['data' => $message], 201);
     }

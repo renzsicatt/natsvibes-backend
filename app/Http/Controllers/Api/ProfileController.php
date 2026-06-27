@@ -48,9 +48,9 @@ class ProfileController extends Controller
         $request->validate(['photo' => ['required', 'image', 'mimes:jpeg,png,webp', 'max:8192']]);
         $profile = $request->user()->profile;
         if ($profile->avatar_url && ! str_starts_with($profile->avatar_url, 'http')) {
-            Storage::disk('public')->delete($profile->avatar_url);
+            Storage::disk(config('filesystems.profile_photos_disk'))->delete($profile->avatar_url);
         }
-        $path = $request->file('photo')->store('profile-photos', 'public');
+        $path = $request->file('photo')->store('profile-photos', config('filesystems.profile_photos_disk'));
         $profile->update(['avatar_url' => $path, 'photo_review_status' => 'pending']);
 
         return response()->json(['data' => ['path' => $path, 'review_status' => 'pending']], 201);

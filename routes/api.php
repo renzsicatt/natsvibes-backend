@@ -1,11 +1,13 @@
 <?php
 
+use App\Http\Controllers\Api\AdminMfaController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BlockController;
-use App\Http\Controllers\Api\FeedbackController;
 use App\Http\Controllers\Api\DeviceTokenController;
+use App\Http\Controllers\Api\FeedbackController;
 use App\Http\Controllers\Api\GroupMessageController;
 use App\Http\Controllers\Api\HangoutController;
+use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\JoinRequestController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
@@ -17,6 +19,7 @@ use App\Http\Controllers\Api\VibeTagController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
+    Route::get('health', HealthController::class)->middleware('throttle:30,1');
     Route::prefix('auth')->group(function (): void {
         Route::post('register', [AuthController::class, 'register'])->middleware('throttle:5,1');
         Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
@@ -65,7 +68,7 @@ Route::prefix('v1')->group(function (): void {
 
         Route::apiResource('blocks', BlockController::class)->only(['index', 'store', 'destroy']);
         Route::apiResource('trusted-contacts', TrustedContactController::class)->except(['show']);
-        Route::post('reports', [ReportController::class, 'store']);
+        Route::post('reports', [ReportController::class, 'store'])->middleware('throttle:5,1');
         Route::get('me/reports', [ReportController::class, 'mine']);
         Route::post('hangouts/{hangout}/safety-checkins', [SafetyCheckinController::class, 'store']);
         Route::put('safety-checkins/{safetyCheckin}', [SafetyCheckinController::class, 'update']);
@@ -76,11 +79,19 @@ Route::prefix('v1')->group(function (): void {
         Route::get('notifications', [NotificationController::class, 'index']);
         Route::post('notifications/read-all', [NotificationController::class, 'readAll']);
         Route::post('notifications/{notification}/read', [NotificationController::class, 'read']);
+        Route::get('notification-preferences', [NotificationController::class, 'preferences']);
+        Route::put('notification-preferences', [NotificationController::class, 'updatePreferences']);
 
         Route::prefix('admin')->middleware('role:admin,super_admin')->group(function (): void {
+            Route::post('mfa/setup', [AdminMfaController::class, 'setup'])->middleware('throttle:3,1');
+            Route::post('mfa/confirm', [AdminMfaController::class, 'confirm'])->middleware('throttle:5,1');
+        });
+
+        Route::prefix('admin')->middleware(['role:admin,super_admin', 'admin.mfa'])->group(function (): void {
             Route::apiResource('venues', VenueController::class)->except(['index', 'show']);
             Route::get('reports', [ReportController::class, 'index']);
             Route::put('reports/{report}', [ReportController::class, 'update']);
+            Route::get('reports/{report}/evidence/{evidence}', [ReportController::class, 'evidence']);
             Route::get('verifications', [ProfileController::class, 'verifications']);
             Route::put('verifications/{profile}', [ProfileController::class, 'verify']);
             Route::post('vibe-tags', [VibeTagController::class, 'store']);
