@@ -34,6 +34,7 @@ class AnonymizeDeletedAccounts extends Command
                 $user->deviceTokens()->delete();
                 $user->trustedContacts()->delete();
                 $user->notificationPreference()->delete();
+                $user->favorites()->delete();
                 $user->profile?->update([
                     'name' => 'Deleted user', 'display_name' => 'Deleted user', 'city' => null,
                     'bio' => null, 'avatar_url' => null, 'going_out_style' => null,

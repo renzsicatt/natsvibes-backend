@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Venue;
 use App\Models\VenueTag;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +16,9 @@ class VenueController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Venue::with(['tags', 'photos'])->whereIn('status', ['listed', 'verified', 'featured', 'active']);
+        $query = Venue::with(['tags', 'photos'])
+            ->withExists(['favorites as is_favorited' => fn (Builder $query) => $query->where('user_id', $request->user()->id)])
+            ->whereIn('status', ['listed', 'verified', 'featured', 'active']);
         if ($request->filled('area')) {
             $query->where('area', $request->string('area'));
         }
@@ -29,11 +32,13 @@ class VenueController extends Controller
         return response()->json(['data' => $query->orderByDesc('is_featured')->orderBy('name')->cursorPaginate(25)]);
     }
 
-    public function show(Venue $venue): JsonResponse
+    public function show(Request $request, Venue $venue): JsonResponse
     {
         abort_unless(in_array($venue->status, ['listed', 'verified', 'featured', 'active'], true), 404);
 
-        return response()->json(['data' => $venue->load(['tags', 'photos'])]);
+        $venue->load(['tags', 'photos'])->loadExists(['favorites as is_favorited' => fn (Builder $query) => $query->where('user_id', $request->user()->id)]);
+
+        return response()->json(['data' => $venue]);
     }
 
     public function store(Request $request): JsonResponse

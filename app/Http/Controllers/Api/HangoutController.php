@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class HangoutController extends Controller
@@ -28,6 +29,8 @@ class HangoutController extends Controller
         $query = Hangout::query()
             ->with(['host.profile', 'venue.photos', 'vibeTags'])
             ->withCount(['activeMembers as members_count'])
+            ->withCount(['joinRequests as waitlist_count' => fn (Builder $query) => $query->where('status', 'waitlisted')])
+            ->withExists(['favorites as is_favorited' => fn (Builder $q) => $q->where('user_id', $request->user()->id)])
             ->whereIn('status', ['open', 'full'])
             ->where('date_time', '>', now())
             ->when($validated['area'] ?? null, fn (Builder $q, string $area) => $q->where('area', $area))
@@ -46,6 +49,7 @@ class HangoutController extends Controller
         abort_if(in_array($hangout->status, ['draft', 'flagged'], true) && ! $this->canManage($request, $hangout), 404);
 
         $hangout->load(['host.profile', 'venue.photos', 'vibeTags', 'activeMembers.profile']);
+        $hangout->loadExists(['favorites as is_favorited' => fn (Builder $q) => $q->where('user_id', $request->user()->id)]);
         $data = $hangout->toArray();
         $isMember = $hangout->activeMembers->contains($request->user());
         if (! $isMember && ! $request->user()->isAdmin()) {
@@ -70,6 +74,7 @@ class HangoutController extends Controller
                 'date_time' => $validated['scheduled_at'],
                 'request_cutoff_at' => $validated['request_cutoff_at'] ?? now()->parse($validated['scheduled_at'])->subHours(2),
                 'status' => 'open',
+                'invite_code' => Str::lower(Str::random(12)),
             ]);
             $hangout->members()->attach($request->user()->id, ['role' => 'host', 'status' => 'active', 'joined_at' => now()]);
             $hangout->vibeTags()->sync($validated['vibe_tag_ids'] ?? []);
@@ -119,6 +124,15 @@ class HangoutController extends Controller
         $items = Hangout::with(['venue', 'vibeTags'])->whereHas('activeMembers', fn (Builder $q) => $q->whereKey($request->user()->id))->latest('date_time')->cursorPaginate(20);
 
         return response()->json(['data' => $items]);
+    }
+
+    public function invite(Request $request, string $code): JsonResponse
+    {
+        $hangout = Hangout::with(['host.profile', 'venue.photos', 'vibeTags'])
+            ->withCount(['activeMembers as members_count'])->where('invite_code', $code)->firstOrFail();
+        abort_if(in_array($hangout->status, ['draft', 'flagged'], true) && ! $this->canManage($request, $hangout), 404);
+
+        return response()->json(['data' => ['hangout' => $hangout, 'share_url' => 'natsvibe://hangouts/'.$hangout->invite_code]]);
     }
 
     private function validateHangout(Request $request, bool $partial = false): array

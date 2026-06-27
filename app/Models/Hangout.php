@@ -29,6 +29,7 @@ class Hangout extends Model
         'previous_status',
         'cancelled_at',
         'cancellation_reason',
+        'invite_code',
     ];
 
     protected $casts = [
@@ -72,5 +73,10 @@ class Hangout extends Model
     public function activeMembers(): BelongsToMany
     {
         return $this->members()->wherePivot('status', 'active');
+    }
+
+    public function favorites()
+    {
+        return $this->morphMany(Favorite::class, 'favoritable');
     }
 }

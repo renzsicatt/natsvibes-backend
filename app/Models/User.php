@@ -65,6 +65,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasOne(NotificationPreference::class);
     }
 
+    public function favorites()
+    {
+        return $this->hasMany(Favorite::class);
+    }
+
     public function isAdmin(): bool
     {
         return in_array($this->role, ['admin', 'super_admin'], true);

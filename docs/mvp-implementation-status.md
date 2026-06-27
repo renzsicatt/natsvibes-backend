@@ -28,6 +28,7 @@ Updated: 2026-06-27
 - TOTP admin MFA enrollment with production enforcement switch
 - delayed account anonymization with a configurable retention grace period
 - dependency-aware API health checks and request-ID tracing
+- venue/hangout favorites, full-capacity waitlists with promotion, and shareable invite deep links
 - scheduled hangout/check-in lifecycle job
 - moderation queue and audited report/profile-review mutations
 - normalized validation/HTTP error envelope
@@ -35,7 +36,7 @@ Updated: 2026-06-27
 
 ## Verification performed
 
-- `php artisan test`: 22 tests, 62 assertions, passing
+- `php artisan test`: 25 tests, 75 assertions, passing
 - Laravel Pint check for touched areas: passing
 - isolated SQLite `migrate:fresh --seed`: passing
 - scheduler registration with isolated cache: passing

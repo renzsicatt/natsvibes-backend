@@ -49,4 +49,9 @@ class Venue extends Model
     {
         return $this->belongsToMany(VenueTag::class, 'venue_tag_map');
     }
+
+    public function favorites()
+    {
+        return $this->morphMany(Favorite::class, 'favoritable');
+    }
 }

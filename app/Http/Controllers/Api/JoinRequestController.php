@@ -38,16 +38,18 @@ class JoinRequestController extends Controller
 
         abort_if($hangout->host_id === $user->id, 422, 'Host is already a member.');
         abort_unless($user->profile?->completion_status === 'completed', 403, 'Complete your profile first.');
-        abort_unless(in_array($hangout->status, ['open'], true), 409, 'Hangout is not accepting requests.');
+        abort_unless(in_array($hangout->status, ['open', 'full'], true), 409, 'Hangout is not accepting requests.');
         abort_if($hangout->request_cutoff_at?->isPast() || $hangout->date_time->isPast(), 409, 'The request cutoff has passed.');
         abort_if($this->blockedPairExists($user->id, $hangout->host_id), 403, 'This interaction is unavailable.');
 
         $joinRequest = JoinRequest::firstOrCreate(
             ['hangout_id' => $hangout->id, 'user_id' => $user->id],
-            ['status' => 'pending', 'notes' => $validated['message'] ?? null],
+            ['status' => $hangout->status === 'full' ? 'waitlisted' : 'pending', 'notes' => $validated['message'] ?? null],
         );
         abort_unless($joinRequest->wasRecentlyCreated, 409, 'A request already exists for this hangout.');
-        $hangout->host->notify(new ActivityNotification('join_request_received', ['hangout_id' => $hangout->id, 'join_request_id' => $joinRequest->id]));
+        if ($joinRequest->status === 'pending') {
+            $hangout->host->notify(new ActivityNotification('join_request_received', ['hangout_id' => $hangout->id, 'join_request_id' => $joinRequest->id]));
+        }
 
         return response()->json(['data' => $joinRequest], 201);
     }
@@ -94,7 +96,7 @@ class JoinRequestController extends Controller
 
     public function cancel(Request $request, JoinRequest $joinRequest): JsonResponse
     {
-        abort_unless($joinRequest->user_id === $request->user()->id && $joinRequest->status === 'pending', 403);
+        abort_unless($joinRequest->user_id === $request->user()->id && in_array($joinRequest->status, ['pending', 'waitlisted'], true), 403);
         $joinRequest->update(['status' => 'cancelled', 'cancelled_at' => now()]);
 
         return response()->json(['data' => $joinRequest]);
@@ -109,9 +111,23 @@ class JoinRequestController extends Controller
         JoinRequest::where(['hangout_id' => $hangout->id, 'user_id' => $request->user()->id, 'status' => 'approved'])->update(['status' => 'withdrawn']);
         if ($hangout->status === 'full' && (! $hangout->request_cutoff_at || $hangout->request_cutoff_at->isFuture())) {
             $hangout->update(['status' => 'open']);
+            $this->promoteWaitlist($hangout);
         }
 
         return response()->json(['data' => ['message' => 'You left the hangout.']]);
+    }
+
+    private function promoteWaitlist(Hangout $hangout): void
+    {
+        $next = $hangout->joinRequests()->where('status', 'waitlisted')->oldest()->lockForUpdate()->first();
+        if (! $next) {
+            return;
+        }
+        $next->update(['status' => 'pending']);
+        DB::afterCommit(function () use ($hangout, $next): void {
+            $next->user->notify(new ActivityNotification('waitlist_promoted', ['hangout_id' => $hangout->id]));
+            $hangout->host->notify(new ActivityNotification('join_request_received', ['hangout_id' => $hangout->id, 'join_request_id' => $next->id]));
+        });
     }
 
     private function blockedPairExists(int $a, int $b): bool

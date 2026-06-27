@@ -49,6 +49,7 @@ class ActivityNotification extends Notification implements ShouldQueue
             'safety_checkin_reminder' => 'Time for your safety check-in.',
             'profile_verification_updated' => 'Your profile verification was updated.',
             'host_verification_updated' => 'Your host verification was updated.',
+            'waitlist_promoted' => 'A spot opened up. Your request is ready for host review.',
         ];
 
         return [

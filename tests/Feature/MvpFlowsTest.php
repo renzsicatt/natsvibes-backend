@@ -78,6 +78,48 @@ class MvpFlowsTest extends TestCase
         $this->getJson('/api/v1/admin/reports')->assertOk()->assertJsonCount(1, 'data.data');
     }
 
+    public function test_user_can_favorite_venues_and_hangouts(): void
+    {
+        $user = $this->user();
+        $hangout = $this->hangout($this->user('host'));
+        Sanctum::actingAs($user);
+
+        $this->postJson("/api/v1/venues/{$hangout->venue_id}/favorite")->assertCreated();
+        $this->postJson("/api/v1/hangouts/{$hangout->id}/favorite")->assertCreated();
+        $this->getJson('/api/v1/favorites')->assertOk()->assertJsonCount(2, 'data.data');
+        $this->getJson('/api/v1/hangouts')->assertJsonPath('data.data.0.is_favorited', true);
+    }
+
+    public function test_full_hangout_waitlists_and_promotes_the_oldest_request(): void
+    {
+        $host = $this->user('host');
+        $member = $this->user();
+        $waiting = $this->user();
+        $hangout = $this->hangout($host);
+        $hangout->update(['group_size_limit' => 2, 'status' => 'full']);
+        $hangout->members()->attach($member->id, ['role' => 'member', 'status' => 'active', 'joined_at' => now()]);
+
+        Sanctum::actingAs($waiting);
+        $this->postJson("/api/v1/hangouts/{$hangout->id}/join-requests")
+            ->assertCreated()->assertJsonPath('data.status', 'waitlisted');
+
+        Sanctum::actingAs($member);
+        $this->postJson("/api/v1/hangouts/{$hangout->id}/leave")->assertOk();
+        $this->assertDatabaseHas('join_requests', ['hangout_id' => $hangout->id, 'user_id' => $waiting->id, 'status' => 'pending']);
+    }
+
+    public function test_invite_code_resolves_to_a_shareable_hangout(): void
+    {
+        $viewer = $this->user();
+        $hangout = $this->hangout($this->user('host'));
+        $hangout->update(['invite_code' => 'nightout1234']);
+        Sanctum::actingAs($viewer);
+
+        $this->getJson('/api/v1/invites/nightout1234')->assertOk()
+            ->assertJsonPath('data.hangout.id', $hangout->id)
+            ->assertJsonPath('data.share_url', 'natsvibe://hangouts/nightout1234');
+    }
+
     private function user(string $role = 'user'): User
     {
         $user = User::factory()->create(['role' => $role, 'status' => 'active']);

@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AdminMfaController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BlockController;
 use App\Http\Controllers\Api\DeviceTokenController;
+use App\Http\Controllers\Api\FavoriteController;
 use App\Http\Controllers\Api\FeedbackController;
 use App\Http\Controllers\Api\GroupMessageController;
 use App\Http\Controllers\Api\HangoutController;
@@ -45,6 +46,12 @@ Route::prefix('v1')->group(function (): void {
         Route::get('hangouts', [HangoutController::class, 'index']);
         Route::get('hangouts/{hangout}', [HangoutController::class, 'show']);
         Route::get('me/join-requests', [JoinRequestController::class, 'mine']);
+        Route::get('favorites', [FavoriteController::class, 'index']);
+        Route::post('venues/{venue}/favorite', [FavoriteController::class, 'favoriteVenue']);
+        Route::delete('venues/{venue}/favorite', [FavoriteController::class, 'unfavoriteVenue']);
+        Route::post('hangouts/{hangout}/favorite', [FavoriteController::class, 'favoriteHangout']);
+        Route::delete('hangouts/{hangout}/favorite', [FavoriteController::class, 'unfavoriteHangout']);
+        Route::get('invites/{code}', [HangoutController::class, 'invite']);
     });
 
     Route::middleware(['auth:sanctum', 'active'])->group(function (): void {
