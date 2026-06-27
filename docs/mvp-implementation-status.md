@@ -30,6 +30,7 @@ Updated: 2026-06-27
 - dependency-aware API health checks and request-ID tracing
 - venue/hangout favorites, full-capacity waitlists with promotion, and shareable invite deep links
 - audited admin user suspension, banning, restoration, and automatic suspension expiry
+- chat replies, reactions, time-limited edits, soft deletion, and audited admin message moderation
 - scheduled hangout/check-in lifecycle job
 - moderation queue and audited report/profile-review mutations
 - normalized validation/HTTP error envelope
@@ -37,7 +38,7 @@ Updated: 2026-06-27
 
 ## Verification performed
 
-- `php artisan test`: 27 tests, 81 assertions, passing
+- `php artisan test`: 29 tests, 92 assertions, passing
 - Laravel Pint check for touched areas: passing
 - isolated SQLite `migrate:fresh --seed`: passing
 - scheduler registration with isolated cache: passing

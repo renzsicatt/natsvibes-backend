@@ -72,6 +72,9 @@ Route::prefix('v1')->group(function (): void {
 
         Route::get('hangouts/{hangout}/messages', [GroupMessageController::class, 'index']);
         Route::post('hangouts/{hangout}/messages', [GroupMessageController::class, 'store'])->middleware('throttle:20,1');
+        Route::put('messages/{message}', [GroupMessageController::class, 'update']);
+        Route::delete('messages/{message}', [GroupMessageController::class, 'destroy']);
+        Route::post('messages/{message}/reactions', [GroupMessageController::class, 'react']);
         Route::post('hangouts/{hangout}/announcements', [GroupMessageController::class, 'announcement']);
 
         Route::apiResource('blocks', BlockController::class)->only(['index', 'store', 'destroy']);
@@ -97,6 +100,7 @@ Route::prefix('v1')->group(function (): void {
 
         Route::prefix('admin')->middleware(['role:admin,super_admin', 'admin.mfa'])->group(function (): void {
             Route::get('users', [AdminUserController::class, 'index']);
+            Route::get('messages', [GroupMessageController::class, 'adminIndex']);
             Route::post('users/{user}/moderate', [AdminUserController::class, 'moderate'])->middleware('throttle:20,1');
             Route::apiResource('venues', VenueController::class)->except(['index', 'show']);
             Route::get('reports', [ReportController::class, 'index']);

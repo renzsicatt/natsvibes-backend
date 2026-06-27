@@ -55,6 +55,37 @@ class MvpFlowsTest extends TestCase
         $this->postJson("/api/v1/hangouts/{$hangout->id}/messages", ['body' => 'See you there'])->assertCreated();
     }
 
+    public function test_members_can_reply_react_edit_and_delete_their_messages(): void
+    {
+        $member = $this->user();
+        $host = $this->user('host');
+        $hangout = $this->hangout($host);
+        $hangout->members()->attach($member->id, ['role' => 'member', 'status' => 'active', 'joined_at' => now()]);
+        Sanctum::actingAs($member);
+
+        $first = $this->postJson("/api/v1/hangouts/{$hangout->id}/messages", ['body' => 'First message'])->assertCreated()->json('data');
+        $reply = $this->postJson("/api/v1/hangouts/{$hangout->id}/messages", ['body' => 'Reply', 'reply_to_id' => $first['id']])
+            ->assertCreated()->assertJsonPath('data.reply_to.id', $first['id'])->json('data');
+        $this->postJson("/api/v1/messages/{$reply['id']}/reactions", ['emoji' => '❤️'])->assertOk()->assertJsonCount(1, 'data');
+        $this->putJson("/api/v1/messages/{$reply['id']}", ['body' => 'Edited reply'])->assertOk()->assertJsonPath('data.message_text', 'Edited reply');
+        $this->deleteJson("/api/v1/messages/{$reply['id']}")->assertNoContent();
+        $this->assertSoftDeleted('group_messages', ['id' => $reply['id']]);
+    }
+
+    public function test_user_cannot_edit_another_members_message(): void
+    {
+        $member = $this->user();
+        $other = $this->user();
+        $host = $this->user('host');
+        $hangout = $this->hangout($host);
+        $hangout->members()->attach($member->id, ['role' => 'member', 'status' => 'active', 'joined_at' => now()]);
+        $hangout->members()->attach($other->id, ['role' => 'member', 'status' => 'active', 'joined_at' => now()]);
+        $message = $hangout->messages()->create(['sender_id' => $other->id, 'message_text' => 'Private ownership', 'type' => 'message']);
+        Sanctum::actingAs($member);
+
+        $this->putJson("/api/v1/messages/{$message->id}", ['body' => 'Tampered'])->assertForbidden();
+    }
+
     public function test_blocked_user_cannot_request_host_hangout(): void
     {
         $guest = $this->user();
