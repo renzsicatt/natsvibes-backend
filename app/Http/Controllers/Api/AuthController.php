@@ -68,7 +68,18 @@ class AuthController extends Controller
         }
 
         if (! in_array($user->status, ['active', 'pending_verification'], true)) {
-            return response()->json(['error' => ['code' => 'ACCOUNT_UNAVAILABLE', 'message' => 'This account cannot sign in.']], 403);
+            return response()->json(['error' => [
+                'code' => match ($user->status) {
+                    'suspended' => 'ACCOUNT_SUSPENDED', 'banned' => 'ACCOUNT_BANNED',
+                    'deletion_pending' => 'ACCOUNT_DELETION_PENDING', default => 'ACCOUNT_UNAVAILABLE',
+                },
+                'message' => match ($user->status) {
+                    'suspended' => 'This account is suspended'.($user->suspended_until ? ' until '.$user->suspended_until->toIso8601String().'.' : '.'),
+                    'banned' => 'This account has been banned. Contact support if you believe this is a mistake.',
+                    'deletion_pending' => 'This account is scheduled for deletion.',
+                    default => 'This account cannot sign in.',
+                },
+            ]], 403);
         }
 
         $user->update(['last_login_at' => now()]);

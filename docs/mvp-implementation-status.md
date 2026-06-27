@@ -29,6 +29,7 @@ Updated: 2026-06-27
 - delayed account anonymization with a configurable retention grace period
 - dependency-aware API health checks and request-ID tracing
 - venue/hangout favorites, full-capacity waitlists with promotion, and shareable invite deep links
+- audited admin user suspension, banning, restoration, and automatic suspension expiry
 - scheduled hangout/check-in lifecycle job
 - moderation queue and audited report/profile-review mutations
 - normalized validation/HTTP error envelope
@@ -36,7 +37,7 @@ Updated: 2026-06-27
 
 ## Verification performed
 
-- `php artisan test`: 25 tests, 75 assertions, passing
+- `php artisan test`: 27 tests, 81 assertions, passing
 - Laravel Pint check for touched areas: passing
 - isolated SQLite `migrate:fresh --seed`: passing
 - scheduler registration with isolated cache: passing
